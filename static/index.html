@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PotholeAI</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style id="rcss">
+  .rpt { font-family:"Segoe UI","Nirmala UI",Arial,sans-serif; color:#111; font-size:13px; max-width:900px; margin:0 auto; }
+  .rpt h1 { font-size:20px; margin:0; color:#0b1f3a; }
+  .rpt h2 { font-size:15px; color:#0b1f3a; border-bottom:2px solid #0b1f3a; padding-bottom:4px; margin:18px 0 10px; }
+  .rpt h3 { font-size:14px; margin:12px 0 6px; }
+  .rpt .rh { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; border-bottom:3px solid #0b1f3a; padding-bottom:10px; }
+  .rpt table { width:100%; border-collapse:collapse; margin:6px 0 10px; }
+  .rpt th, .rpt td { border:1px solid #cbd5e1; padding:6px 8px; text-align:left; vertical-align:top; }
+  .rpt th { background:#eef3fa; width:30%; }
+  .rpt .item { break-inside:avoid; border:1px solid #cbd5e1; border-radius:6px; padding:10px; margin-bottom:14px; }
+  .rpt img { width:100%; max-height:340px; object-fit:contain; border:1px solid #e2e8f0; }
+  .rpt .disc { font-size:11px; color:#444; background:#f8fafc; padding:8px; border-radius:4px; }
+  .rpt .sign { display:flex; justify-content:space-between; margin-top:40px; gap:20px; }
+  .rpt .sign div { border-top:1px solid #111; width:40%; padding-top:4px; text-align:center; }
+</style>
+
+<style>
+  :root { --navy:#0b1f3a; --blue:#1e5fa8; --bg:#f4f7fb; --text:#1d2939; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,"Segoe UI","Nirmala UI",Arial,sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--navy); color:#fff; padding:16px 24px; font-size:20px; font-weight:600; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+  .lang button { background:#fff; color:var(--navy); padding:6px 12px; margin-left:6px; font-weight:600; }
+  main { max-width:1200px; margin:24px auto; padding:0 16px; display:grid; gap:20px; grid-template-columns:1fr 1fr; }
+  @media (max-width:800px) { main { grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  .full { grid-column:1 / -1; }
+  h2 { margin:0 0 12px; font-size:16px; color:var(--navy); }
+  h3 { margin:0 0 8px; font-size:15px; color:var(--navy); }
+  button { background:var(--blue); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:15px; cursor:pointer; margin-right:8px; margin-top:6px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .lbl { display:block; margin:10px 0; font-size:14px; }
+  .lbl input[type=file] { display:block; margin-top:4px; }
+  select, textarea { padding:6px; border-radius:6px; border:1px solid #cbd5e1; max-width:100%; font-size:14px; }
+  textarea { width:100%; font-family:inherit; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-top:8px; }
+  .stat { background:var(--bg); border-radius:8px; padding:10px; text-align:center; font-size:13px; }
+  .stat b { display:block; font-size:20px; color:var(--navy); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
+  .img-card img { width:100%; border-radius:8px; border:1px solid #e2e8f0; }
+  .img-card table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  .img-card th, .img-card td { padding:6px; border-bottom:1px solid #e5e7eb; text-align:left; }
+  .loc { font-size:13px; margin-top:8px; }
+  #map { height:360px; border-radius:8px; }
+  .note { font-size:12px; color:#667085; margin:6px 0 0; }
+  .warn { color:#b54708; font-size:13px; }
+  .err { color:#b42318; }
+  #report { display:none; }
+  @media print {
+    body * { visibility:hidden; }
+    #report, #report * { visibility:visible; }
+    #report { display:block !important; position:absolute; left:0; top:0; width:100%; background:#fff; padding:16px; }
+    .rpt .item { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <span data-i18n="title"></span>
+  <span class="lang">
+    <button onclick="setLang('en')">EN</button>
+    <button onclick="setLang('hi')">हिंदी</button>
+  </span>
+</header>
+
+<main>
+  <section class="card">
+    <h2 data-i18n="upload"></h2>
+    <label class="lbl"><span data-i18n="pickFiles"></span>
+      <input type="file" id="files" multiple accept=".jpg,.jpeg,.png,.zip">
+    </label>
+    <label class="lbl"><span data-i18n="pickFolder"></span>
+      <input type="file" id="folder" webkitdirectory multiple>
+    </label>
+    <p class="note" data-i18n="limits"></p>
+    <p class="lbl"><span data-i18n="conf"></span>: <b id="confVal">0.25</b><br>
+      <input type="range" id="conf" min="0.05" max="0.95" step="0.05" value="0.25" style="width:100%">
+    </p>
+    <label class="lbl"><input type="checkbox" id="useGps" checked> <span data-i18n="gps"></span></label>
+    <label class="lbl"><span data-i18n="defAuth"></span><br><select id="defAuth"></select></label>
+    <button id="runBtn" disabled data-i18n="run"></button>
+    <p id="status"></p>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="summary"></h2>
+    <div id="sumStats" class="stats"></div>
+    <p class="note" id="sev"></p>
+    <div id="errs"></div>
+  </section>
+
+  <section class="card full">
+    <h2 data-i18n="resultsTitle"></h2>
+    <div id="results" class="cards"></div>
+  </section>
+
+  <section class="card full">
+    <h2 data-i18n="mapTitle"></h2>
+    <div id="map"></div>
+    <p class="note" data-i18n="mapNote"></p>
+  </section>
+
+  <section class="card full">
+    <h2 data-i18n="reportTitle2"></h2>
+    <label class="lbl"><span data-i18n="remarks"></span><br>
+      <textarea id="remarks" rows="3"></textarea>
+    </label>
+    <button id="rptBtn" disabled onclick="printReport()" data-i18n="printBtn"></button>
+    <button id="dlBtn" disabled onclick="downloadReport()" data-i18n="dlBtn"></button>
+    <p class="note" data-i18n="rptNote"></p>
+  </section>
+</main>
+
+<div id="report"></div>
+
+<script>
+const T = {
+  en: {
+    title: 'PotholeAI – Intelligent Road Monitoring System',
+    upload: '1. Upload images / ZIP / folder',
+    pickFiles: 'Images ya ZIP chunein (multiple allowed)',
+    pickFolder: 'Ya poora folder chunein',
+    limits: 'JPG, PNG aur ZIP allowed. Ek baar mein max 30 images. ZIP ke andar ki images bhi process hongi.',
+    conf: 'Confidence threshold',
+    gps: 'Photo mein GPS na ho to meri current location use karein',
+    defAuth: 'Default responsible authority',
+    autoAuth: 'Auto (road ke hisaab se suggest)',
+    run: 'Detect potholes',
+    running: 'Processing ho rahi hai... zyada images hon to time lagega',
+    done: 'Ho gaya',
+    fail: 'Detection fail hua',
+    noFiles: 'Pehle image, ZIP ya folder chunein',
+    summary: '2. Summary',
+    images: 'Images', potholes: 'Potholes', avg: 'Avg confidence',
+    time: 'Total inference (s)', cg: 'Chhattisgarh mein (located images)',
+    sevTitle: 'Severity (estimate)',
+    sevLabels: { Low: 'Low', Medium: 'Medium', High: 'High' },
+    errors: 'Warnings / errors',
+    resultsTitle: '3. Image-wise results',
+    noResults: 'Abhi koi result nahi',
+    noLoc: 'GPS / location nahi mili',
+    srcPhoto: 'Photo ka GPS (EXIF)', srcBrowser: 'Browser location',
+    coords: 'Coordinates', address: 'Address', district: 'District', state: 'State',
+    road: 'Road', suggested: 'Auto-suggested', authority: 'Responsible authority',
+    notCG: 'Yeh location Chhattisgarh ki nahi lag rahi',
+    downloadImg: 'Processed image download karein',
+    noDet: 'Is threshold par koi pothole nahi mila',
+    col: ['#', 'Class', 'Confidence', 'Severity', 'Box (x1, y1, x2, y2)'],
+    mapTitle: 'Map',
+    mapNote: 'Har image ka marker map par. Data sirf is browser session mein hai, server par save nahi hota.',
+    reportTitle2: '4. Report',
+    remarks: 'Remarks / action notes (optional)',
+    remarksPh: 'Jaise: Main road par 3 gadhe, turant marammat ki zarurat',
+    printBtn: 'Report print / PDF save karein',
+    dlBtn: 'Report HTML download karein',
+    rptNote: 'Print dialog mein "Save as PDF" chunein.',
+    rTitle: 'PotholeAI – Road Damage Detection Report',
+    rId: 'Report ID', date: 'Date', jur: 'Jurisdiction',
+    jurCG: 'Chhattisgarh', jurMixed: 'Mixed (Chhattisgarh aur bahar)', jurNone: 'Location unknown',
+    sumTbl: 'Summary', detailsTitle: 'Location-wise details',
+    status: 'Status', open: 'Open (action pending)',
+    remarksLbl: 'Remarks', disc: 'Disclaimer',
+    discText: 'Yeh report AI model (YOLO, single class "Pothole") se bani hai. Detections sirf sanket hain aur action se pehle site par verify karna zaruri hai. Severity bounding box ke area par aadharit anumaan hai, koi standard engineering measure nahi. Authority ke naam OpenStreetMap road data par aadharit suggestion hain, aur ho sakta hai adhoore hon. Sahi vibhag (PWD / Nagar Nigam / PMGSY / NHAI) se confirm karein.',
+    signA: 'Prepared by', signB: 'Verified by (Authority)'
+  },
+  hi: {
+    title: 'PotholeAI – इंटेलिजेंट रोड मॉनिटरिंग सिस्टम',
+    upload: '1. Images / ZIP / folder upload करें',
+    pickFiles: 'Images या ZIP चुनें (एक से ज़्यादा भी)',
+    pickFolder: 'या पूरा folder चुनें',
+    limits: 'JPG, PNG और ZIP allowed हैं। एक बार में अधिकतम 30 images। ZIP के अंदर की images भी process होंगी।',
+    conf: 'Confidence threshold',
+    gps: 'फोटो में GPS न हो तो मेरी current location use करें',
+    defAuth: 'डिफ़ॉल्ट ज़िम्मेदार विभाग',
+    autoAuth: 'Auto (सड़क के हिसाब से सुझाव)',
+    run: 'Potholes detect करें',
+    running: 'Processing हो रही है... ज़्यादा images हों तो समय लगेगा',
+    done: 'हो गया',
+    fail: 'Detection फेल हुआ',
+    noFiles: 'पहले image, ZIP या folder चुनें',
+    summary: '2. सारांश',
+    images: 'Images', potholes: 'Potholes', avg: 'औसत confidence',
+    time: 'कुल inference (सेकंड)', cg: 'छत्तीसगढ़ में (location वाली images)',
+    sevTitle: 'गंभीरता (अनुमान)',
+    sevLabels: { Low: 'कम', Medium: 'मध्यम', High: 'ज़्यादा' },
+    errors: 'चेतावनी / त्रुटियाँ',
+    resultsTitle: '3. Image-वार नतीजे',
+    noResults: 'अभी कोई नतीजा नहीं',
+    noLoc: 'GPS / location नहीं मिली',
+    srcPhoto: 'फोटो का GPS (EXIF)', srcBrowser: 'Browser location',
+    coords: 'Coordinates', address: 'पता', district: 'ज़िला', state: 'राज्य',
+    road: 'सड़क', suggested: 'स्वचालित सुझाव', authority: 'ज़िम्मेदार विभाग',
+    notCG: 'यह location छत्तीसगढ़ की नहीं लग रही',
+    downloadImg: 'Processed image download करें',
+    noDet: 'इस threshold पर कोई pothole नहीं मिला',
+    col: ['#', 'Class', 'Confidence', 'गंभीरता', 'Box (x1, y1, x2, y2)'],
+    mapTitle: 'नक्शा',
+    mapNote: 'हर image का marker नक्शे पर। डेटा सिर्फ़ इसी browser session में है, server पर save नहीं होता।',
+    reportTitle2: '4. रिपोर्ट',
+    remarks: 'टिप्पणी / कार्रवाई नोट (वैकल्पिक)',
+    remarksPh: 'जैसे: मुख्य सड़क पर 3 गड्ढे, तुरंत मरम्मत की ज़रूरत',
+    printBtn: 'रिपोर्ट print / PDF save करें',
+    dlBtn: 'रिपोर्ट HTML download करें',
+    rptNote: 'Print dialog में "Save as PDF" चुनें।',
+    rTitle: 'PotholeAI – सड़क क्षति पहचान रिपोर्ट',
+    rId: 'रिपोर्ट ID', date: 'तारीख़', jur: 'क्षेत्राधिकार',
+    jurCG: 'छत्तीसगढ़', jurMixed: 'मिश्रित (छत्तीसगढ़ और बाहर)', jurNone: 'स्थान अज्ञात',
+    sumTbl: 'सारांश', detailsTitle: 'स्थान-वार विवरण',
+    status: 'स्थिति', open: 'खुला (कार्रवाई बाकी)',
+    remarksLbl: 'टिप्पणी', disc: 'अस्वीकरण',
+    discText: 'यह रिपोर्ट AI model (YOLO, एक class "Pothole") से बनी है। Detections सिर्फ़ संकेत हैं और कार्रवाई से पहले साइट पर सत्यापन ज़रूरी है। गंभीरता bounding box के क्षेत्र पर आधारित अनुमान है, कोई standard engineering माप नहीं। विभाग के नाम OpenStreetMap road data पर आधारित सुझाव हैं और अधूरे हो सकते हैं। सही विभाग (PWD / नगर निगम / PMGSY / NHAI) से पुष्टि करें।',
+    signA: 'तैयार करने वाला', signB: 'सत्यापित (विभाग)'
+  }
+};
+
+const AUTH_KEYS = ['nhai', 'cg_pwd', 'pmgsy', 'urban', 'other'];
+const AUTH = {
+  en: {
+    nhai: 'NHAI – National Highway',
+    cg_pwd: 'Chhattisgarh PWD – State Highway / Major District Road',
+    pmgsy: 'PMGSY / Rural Development – Village road',
+    urban: 'Nagar Nigam / Nagar Palika / Nagar Panchayat – Urban road',
+    other: 'Other / Not sure'
+  },
+  hi: {
+    nhai: 'NHAI – राष्ट्रीय राजमार्ग',
+    cg_pwd: 'छत्तीसगढ़ PWD – राज्य मार्ग / प्रमुख ज़िला सड़क',
+    pmgsy: 'PMGSY / ग्रामीण विकास – गाँव की सड़क',
+    urban: 'नगर निगम / नगर पालिका / नगर पंचायत – शहरी सड़क',
+    other: 'अन्य / पक्का नहीं'
+  }
+};
+
+let lang = 'en';
+let results = [];
+let errors = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Map: Leaflet load na ho to bhi upload aur report chalega
+let map = null, markerLayer = null;
+if (window.L) {
+  map = L.map('map').setView([21.25, 81.63], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+}
+
+function buildDefAuth() {
+  const sel = $('defAuth');
+  const cur = sel.value || 'auto';
+  sel.innerHTML = `<option value="auto">${T[lang].autoAuth}</option>` +
+    AUTH_KEYS.map(k => `<option value="${k}">${esc(AUTH[lang][k])}</option>`).join('');
+  sel.value = cur;
+}
+
+function applyLang() {
+  const t = T[lang];
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t[el.dataset.i18n];
+  });
+  $('runBtn').textContent = t.run;
+  $('remarks').placeholder = t.remarksPh;
+  buildDefAuth();
+}
+
+function setLang(l) {
+  lang = l;
+  applyLang();
+  renderAll();
+}
+
+$('conf').oninput = () => $('confVal').textContent = $('conf').value;
+
+function pickedFiles() {
+  const all = [...$('files').files, ...$('folder').files];
+  const seen = new Set();
+  const out = [];
+  for (const f of all) {
+    if (!/\.(jpe?g|png|zip)$/i.test(f.name)) continue;
+    const key = (f.webkitRelativePath || f.name) + '|' + f.size;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f);
+  }
+  return out;
+}
+
+function onPick() {
+  const files = pickedFiles();
+  const skipped = [...$('files').files, ...$('folder').files]
+    .filter(f => !/\.(jpe?g|png|zip)$/i.test(f.name)).length;
+  $('status').innerHTML = files.length
+    ? `${files.length} file(s) chuni gayi` + (skipped ? ` <span class="warn">(${skipped} unsupported skip)</span>` : '')
+    : `<span class="err">${T[lang].noFiles}</span>`;
+  $('runBtn').disabled = files.length === 0;
+}
+$('files').onchange = onPick;
+$('folder').onchange = onPick;
+
+function getBrowserGps() {
+  if (!$('useGps').checked || !navigator.geolocation) return Promise.resolve(null);
+  return new Promise(resolve => navigator.geolocation.getCurrentPosition(
+    p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+    () => resolve(null),
+    { timeout: 6000, maximumAge: 60000 }
+  ));
+}
+
+async function runBatch() {
+  const t = T[lang];
+  const files = pickedFiles();
+  if (!files.length) { $('status').textContent = t.noFiles; return; }
+
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f, f.name));
+  fd.append('conf', $('conf').value);
+
+  $('runBtn').disabled = true;
+  $('status').textContent = t.running;
+  try {
+    const g = await getBrowserGps();
+    if (g) { fd.append('lat', g.lat); fd.append('lon', g.lon); }
+
+    const res = await fetch('/api/detect-batch', { method: 'POST', body: fd });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : t.fail);
+
+    const def = $('defAuth').value;
+    results = data.results.map(r => ({
+      ...r,
+      authority: def === 'auto' ? ((r.location && r.location.suggested_authority) || 'other') : def
+    }));
+    errors = data.errors || [];
+    $('status').textContent = `${t.done} (${data.count})`;
+    renderAll();
+  } catch (e) {
+    $('status').innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  } finally {
+    $('runBtn').disabled = pickedFiles().length === 0;
+  }
+}
+$('runBtn').onclick = runBatch;
+
+function allDets() {
+  return results.flatMap(r => r.detections);
+}
+
+function sevCounts(dets) {
+  const c = { Low: 0, Medium: 0, High: 0 };
+  dets.forEach(x => c[x.severity]++);
+  return c;
+}
+
+function renderAll() {
+  renderSummary();
+  renderErrors();
+  renderResults();
+  renderMap();
+  $('rptBtn').disabled = !results.length;
+  $('dlBtn').disabled = !results.length;
+}
+
+function renderSummary() {
+  const t = T[lang];
+  const d = allDets();
+  const avg = d.length ? (d.reduce((s, x) => s + x.confidence, 0) / d.length).toFixed(2) : '-';
+  const total = results.reduce((s, r) => s + r.inference_time, 0).toFixed(3);
+  const located = results.filter(r => r.location).length;
+  const cg = results.filter(r => r.location && r.location.in_chhattisgarh).length;
+  const sc = sevCounts(d);
+  const stats = [
+    [results.length, t.images],
+    [d.length, t.potholes],
+    [avg, t.avg],
+    [total, t.time],
+    [`${cg} / ${located}`, t.cg]
+  ];
+  $('sumStats').innerHTML = stats.map(([v, l]) =>
+    `<div class="stat"><b>${v}</b>${l}</div>`).join('');
+  $('sev').textContent = `${t.sevTitle}: ${t.sevLabels.Low} ${sc.Low} · ${t.sevLabels.Medium} ${sc.Medium} · ${t.sevLabels.High} ${sc.High}`;
+}
+
+function renderErrors() {
+  const t = T[lang];
+  $('errs').innerHTML = errors.length
+    ? `<h3>${t.errors}</h3><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`
+    : '';
+}
+
+function authSelect(i, selected) {
+  return `<select onchange="setAuth(${i}, this.value)">` +
+    AUTH_KEYS.map(k => `<option value="${k}"${k === selected ? ' selected' : ''}>${esc(AUTH[lang][k])}</option>`).join('') +
+    `</select>`;
+}
+
+function setAuth(i, v) {
+  results[i].authority = v;
+  renderMap();
+}
+
+function locHtml(loc) {
+  const t = T[lang];
+  if (!loc) return `<p class="note">${t.noLoc}</p>`;
+  const src = loc.source === 'photo' ? t.srcPhoto : t.srcBrowser;
+  const road = loc.road ? (loc.road.name || loc.road.ref || '-') : '-';
+  const cgNote = loc.in_chhattisgarh ? '' : `<p class="warn">${t.notCG}</p>`;
+  return `<p><b>${t.coords}:</b> ${loc.lat}, ${loc.lon} (${src})<br>
+    <b>${t.state}:</b> ${esc(loc.state || '-')} · <b>${t.district}:</b> ${esc(loc.district || '-')}<br>
+    <b>${t.address}:</b> ${esc(loc.address || '-')}<br>
+    <b>${t.road}:</b> ${esc(road)}<br>
+    <b>${t.suggested}:</b> ${esc(AUTH[lang][loc.suggested_authority] || '-')}<br>
+    <a href="https://www.google.com/maps?q=${loc.lat},${loc.lon}" target="_blank" rel="noopener">Google Maps</a></p>
+    ${cgNote}`;
+}
+
+function cardHtml(r, i) {
+  const t = T[lang];
+  const rows = r.detections.length
+    ? r.detections.map((x, j) =>
+        `<tr><td>${j + 1}</td><td>${esc(x.class_name)}</td><td>${x.confidence.toFixed(2)}</td>` +
+        `<td>${t.sevLabels[x.severity]}</td><td>${x.bbox.x1}, ${x.bbox.y1}, ${x.bbox.x2}, ${x.bbox.y2}</td></tr>`).join('')
+    : `<tr><td colspan="5">${t.noDet}</td></tr>`;
+  const base = esc(r.file_name.replace(/\.[^.]+$/, ''));
+  return `<div class="card img-card">
+    <h3>${i + 1}. ${esc(r.file_name)} – ${r.total_potholes} ${t.potholes}</h3>
+    <img src="${r.processed_image}" alt="">
+    <div class="loc">${locHtml(r.location)}</div>
+    <label class="lbl"><span>${t.authority}</span><br>${authSelect(i, r.authority)}</label>
+    <table>
+      <thead><tr>${t.col.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <a href="${r.processed_image}" download="${base}_detected.jpg">${t.downloadImg}</a>
+  </div>`;
+}
+
+function renderResults() {
+  const t = T[lang];
+  $('results').innerHTML = results.length
+    ? results.map((r, i) => cardHtml(r, i)).join('')
+    : `<p>${t.noResults}</p>`;
+}
+
+function renderMap() {
+  if (!map) return;
+  markerLayer.clearLayers();
+  const pts = [];
+  results.forEach((r, i) => {
+    if (!r.location) return;
+    const loc = r.location;
+    pts.push([loc.lat, loc.lon]);
+    L.marker([loc.lat, loc.lon]).bindPopup(
+      `<b>${i + 1}. ${esc(r.file_name)}</b><br>${r.total_potholes} ${T[lang].potholes}<br>${esc(AUTH[lang][r.authority])}`
+    ).addTo(markerLayer);
+  });
+  if (pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 16 });
+}
+
+function reportInner() {
+  const t = T[lang];
+  const now = new Date();
+  const rid = 'PAR-' + now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  const located = results.filter(r => r.location);
+  const cg = located.filter(r => r.location.in_chhattisgarh).length;
+  const jur = !located.length ? t.jurNone : (cg === located.length ? t.jurCG : t.jurMixed);
+  const d = allDets();
+  const avg = d.length ? (d.reduce((s, x) => s + x.confidence, 0) / d.length).toFixed(2) : '-';
+  const sc = sevCounts(d);
+
+  const items = results.map((r, i) => {
+    const loc = r.location;
+    const rows = r.detections.length
+      ? r.detections.map((x, j) =>
+          `<tr><td>${j + 1}</td><td>${esc(x.class_name)}</td><td>${x.confidence.toFixed(2)}</td>` +
+          `<td>${t.sevLabels[x.severity]}</td><td>${x.bbox.x1}, ${x.bbox.y1}, ${x.bbox.x2}, ${x.bbox.y2}</td></tr>`).join('')
+      : `<tr><td colspan="5">${t.noDet}</td></tr>`;
+    const locRows = loc
+      ? `<tr><th>${t.coords}</th><td>${loc.lat}, ${loc.lon} (${loc.source === 'photo' ? t.srcPhoto : t.srcBrowser})</td></tr>
+         <tr><th>${t.state}</th><td>${esc(loc.state || '-')}</td></tr>
+         <tr><th>${t.district}</th><td>${esc(loc.district || '-')}</td></tr>
+         <tr><th>${t.address}</th><td>${esc(loc.address || '-')}</td></tr>
+         <tr><th>${t.road}</th><td>${esc((loc.road && (loc.road.name || loc.road.ref)) || '-')}</td></tr>`
+      : `<tr><th>${t.coords}</th><td>${t.noLoc}</td></tr>`;
+    const sugg = loc ? `<br><small>(${t.suggested}: ${esc(AUTH[lang][loc.suggested_authority])})</small>` : '';
+    return `<div class="item">
+      <h3>${i + 1}. ${esc(r.file_name)}</h3>
+      <img src="${r.processed_image}" alt="">
+      <table>
+        ${locRows}
+        <tr><th>${t.authority}</th><td>${esc(AUTH[lang][r.authority])}${sugg}</td></tr>
+        <tr><th>${t.status}</th><td>${t.open}</td></tr>
+        <tr><th>${t.potholes}</th><td>${r.total_potholes} · ${t.avg}: ${r.total_potholes ? r.average_confidence.toFixed(2) : '-'}</td></tr>
+      </table>
+      <table>
+        <thead><tr>${t.col.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  const remarks = esc($('remarks').value.trim()) || '—';
+
+  return `<div class="rpt">
+    <div class="rh">
+      <div><h1>${t.rTitle}</h1><p>${t.rId}: ${rid} · ${t.date}: ${now.toLocaleString()}</p></div>
+      <div><b>${t.jur}:</b> ${jur}</div>
+    </div>
+    <h2>1. ${t.sumTbl}</h2>
+    <table>
+      <tr><th>${t.images}</th><td>${results.length}</td></tr>
+      <tr><th>${t.potholes}</th><td>${d.length}</td></tr>
+      <tr><th>${t.avg}</th><td>${avg}</td></tr>
+      <tr><th>${t.sevTitle}</th><td>${t.sevLabels.Low} ${sc.Low} · ${t.sevLabels.Medium} ${sc.Medium} · ${t.sevLabels.High} ${sc.High}</td></tr>
+    </table>
+    <h2>2. ${t.detailsTitle}</h2>
+    ${items}
+    <h2>3. ${t.remarksLbl}</h2>
+    <p>${remarks}</p>
+    <h2>4. ${t.disc}</h2>
+    <p class="disc">${t.discText}</p>
+    <div class="sign"><div>${t.signA}</div><div>${t.signB}</div></div>
+  </div>`;
+}
+
+function printReport() {
+  if (!results.length) return;
+  $('report').innerHTML = reportInner();
+  window.print();
+}
+
+function downloadReport() {
+  if (!results.length) return;
+  const css = $('rcss').textContent;
+  const doc = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8">` +
+    `<title>${T[lang].rTitle}</title><style>${css}</style></head><body>${reportInner()}</body></html>`;
+  const url = URL.createObjectURL(new Blob([doc], { type: 'text/html' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PotholeAI_Report_${Date.now()}.html`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+applyLang();
+renderAll();
+</script>
+</body>
+</html>
